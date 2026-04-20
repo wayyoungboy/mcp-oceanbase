@@ -2,9 +2,7 @@ name: Build powermem-mcp
 
 on:
   push:
-    - *
   pull_request:
-    - *
   workflow_dispatch:
 
 jobs:
