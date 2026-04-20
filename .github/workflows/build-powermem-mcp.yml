@@ -2,13 +2,9 @@ name: Build powermem-mcp
 
 on:
   push:
-    tags:
-      - "powermem-mcp/v*"
-    paths:
-      - "src/powermem_mcp_server/**"
+    - *
   pull_request:
-    paths:
-      - "src/powermem_mcp_server/**"
+    - *
   workflow_dispatch:
 
 jobs:
