@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
-import ocp_tool
+
+from ocp_mcp import ocp_tool
 
 
 logger = logging.getLogger(__name__)
@@ -1133,3 +1134,11 @@ def get_oceanbase_performance_report(
 
     # Optionally save the HTML content to a file
     return ocp_tool.get_performance_report(cluster_id, report_id, directory)
+
+
+if __name__ == "__main__":
+    # Supported: cd ocp_mcp/ && python3 -m server --transport sse --port 8000
+    #            cd ocp_mcp/ && python3 -m server --transport streamable-http --port 8000
+    from ocp_mcp.main import main
+
+    main()
