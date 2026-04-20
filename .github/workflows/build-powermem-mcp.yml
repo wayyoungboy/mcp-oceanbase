@@ -1,0 +1,40 @@
+name: Build powermem-mcp
+
+on:
+  push:
+    tags:
+      - "powermem-mcp/v*"
+    paths:
+      - "src/powermem_mcp_server/**"
+  pull_request:
+    paths:
+      - "src/powermem_mcp_server/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build wheel & sdist
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build
+        working-directory: src/powermem_mcp_server
+        run: python -m build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: powermem-mcp-dist
+          path: src/powermem_mcp_server/dist/
+          retention-days: 30

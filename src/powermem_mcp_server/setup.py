@@ -47,7 +47,7 @@ def get_requirements():
 
 setup(
     name="powermem-mcp",
-    version="0.1.0",
+    version="0.3.0",
     description="PowerMem MCP Server - Model Context Protocol server for PowerMem memory management",
     long_description=read_readme(),
     long_description_content_type="text/markdown",

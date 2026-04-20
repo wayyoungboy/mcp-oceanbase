@@ -123,8 +123,8 @@ def add_memory(
     user_id: Optional[str] = None,
     agent_id: Optional[str] = None,
     run_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    infer: bool = True,
+    metadata: Optional[Union[str, Dict[str, Any]]] = None,
+    infer: Union[bool, str] = True,
 ) -> str:
     """
     Add new memory to storage
@@ -174,6 +174,17 @@ def add_memory(
         - Each dict message MUST have 'role' (user/assistant/system) and 'content' fields
         - If 'role' is missing, it will be automatically set to 'user'
     """
+    # Coerce string metadata to dict
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            return json.dumps({"success": False, "error": "metadata must be a valid JSON object string or dict."}, ensure_ascii=False)
+
+    # Coerce string infer to bool
+    if isinstance(infer, str):
+        infer = infer.strip().lower() not in ("false", "0", "no")
+
     print(
         f"[add_memory] Called with user_id={user_id}, agent_id={agent_id}, run_id={run_id}, infer={infer}"
     )
@@ -320,7 +331,7 @@ def update_memory(
     content: str,
     user_id: Optional[str] = None,
     agent_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Union[str, Dict[str, Any]]] = None,
 ) -> str:
     """
     Update memory
@@ -429,8 +440,8 @@ def add_memory_with_profile(
     user_id: str,
     agent_id: Optional[str] = None,
     run_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    infer: bool = True,
+    metadata: Optional[Union[str, Dict[str, Any]]] = None,
+    infer: Union[bool, str] = True,
     profile_type: str = "content",
     custom_topics: Optional[str] = None,
     strict_mode: bool = False,
@@ -504,6 +515,17 @@ def add_memory_with_profile(
         - Each dict message MUST have 'role' (user/assistant/system) and 'content' fields
         - If 'role' is missing, it will be automatically set to 'user'
     """
+    # Coerce string metadata to dict
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            return json.dumps({"success": False, "error": "metadata must be a valid JSON object string or dict."}, ensure_ascii=False)
+
+    # Coerce string infer to bool
+    if isinstance(infer, str):
+        infer = infer.strip().lower() not in ("false", "0", "no")
+
     print(
         f"[add_memory_with_profile] Called with user_id={user_id}, agent_id={agent_id}, run_id={run_id}, infer={infer}, profile_type={profile_type}"
     )
