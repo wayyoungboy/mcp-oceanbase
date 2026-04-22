@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 from powermem import create_memory, auto_config
 from powermem.user_memory import UserMemory
 import json
+from dotenv import load_dotenv, find_dotenv
 from powermem_mcp.http_client import PowerMemHTTPClient, PowerMemUserHTTPClient
 
 # ============================================================================
@@ -1028,6 +1029,11 @@ def main():
         python server.py stdio
         powermem-mcp streamable-http 8000
     """
+    # Load .env before reading any env vars (fix: is_proxy_mode() needs POWERMEM_SERVER_URL at startup)
+    _dotenv_path = find_dotenv(usecwd=True)
+    if _dotenv_path:
+        load_dotenv(_dotenv_path, override=False)
+
     # Parse command line arguments
     transport = "streamable-http"  # Default to streamable-http
     port = 8000
