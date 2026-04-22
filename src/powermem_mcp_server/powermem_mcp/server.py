@@ -9,6 +9,7 @@ Provides 13 tools for memory and user profile management:
 - 6 user profile tools: add_with_profile, search_with_profile, get_profile, list_profiles, delete_profile, delete_memory_with_profile
 """
 
+import os
 import sys
 from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, date
@@ -16,6 +17,7 @@ from fastmcp import FastMCP
 from powermem import create_memory, auto_config
 from powermem.user_memory import UserMemory
 import json
+from powermem_mcp.http_client import PowerMemHTTPClient, PowerMemUserHTTPClient
 
 # ============================================================================
 # Part 1: MCP Server
@@ -27,6 +29,33 @@ mcp = FastMCP("PowerMem MCP Server")
 # Global Memory instance (lazy initialization)
 _memory_instance = None
 _user_memory_instance = None
+
+# Global HTTP client instances for proxy mode (lazy initialization)
+_http_memory_client = None
+_http_user_client = None
+
+
+def is_proxy_mode() -> bool:
+    """Return True if POWERMEM_SERVER_URL is set (proxy mode), False for embedded mode."""
+    return bool(os.getenv("POWERMEM_SERVER_URL"))
+
+
+def get_http_memory_client() -> PowerMemHTTPClient:
+    global _http_memory_client
+    if _http_memory_client is None:
+        url = os.getenv("POWERMEM_SERVER_URL", "")
+        api_key = os.getenv("POWERMEM_SERVER_API_KEY")
+        _http_memory_client = PowerMemHTTPClient(url, api_key)
+    return _http_memory_client
+
+
+def get_http_user_client() -> PowerMemUserHTTPClient:
+    global _http_user_client
+    if _http_user_client is None:
+        url = os.getenv("POWERMEM_SERVER_URL", "")
+        api_key = os.getenv("POWERMEM_SERVER_API_KEY")
+        _http_user_client = PowerMemUserHTTPClient(url, api_key)
+    return _http_user_client
 
 
 def get_memory():
@@ -245,15 +274,26 @@ def add_memory(
         )
 
     try:
-        memory = get_memory()
-        result = memory.add(
-            messages=messages,
-            user_id=user_id,
-            agent_id=agent_id,
-            run_id=run_id,
-            metadata=metadata,
-            infer=infer,
-        )
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            result = client.add(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                metadata=metadata,
+                infer=infer,
+            )
+        else:
+            memory = get_memory()
+            result = memory.add(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                metadata=metadata,
+                infer=infer,
+            )
         print("[add_memory] Successfully added memory")
         return format_memories_for_llm(result)
     except Exception as e:
@@ -294,23 +334,39 @@ def search_memories(
             filters = json.loads(filters)
         except json.JSONDecodeError:
             return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
-    memory = get_memory()
-    result = memory.search(
-        query=query,
-        user_id=user_id,
-        agent_id=agent_id,
-        run_id=run_id,
-        limit=limit,
-        threshold=threshold,
-        filters=filters,
-    )
-    print(f"[search_memories] result: {result}")
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            result = client.search(
+                query=query,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                limit=limit,
+                threshold=threshold,
+                filters=filters,
+            )
+        else:
+            memory = get_memory()
+            result = memory.search(
+                query=query,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                limit=limit,
+                threshold=threshold,
+                filters=filters,
+            )
+        print(f"[search_memories] result: {result}")
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[search_memories] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to search memories: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
 def get_memory_by_id(
-    memory_id: int, user_id: Optional[str] = None, agent_id: Optional[str] = None
+    memory_id: Union[int, str], user_id: Optional[str] = None, agent_id: Optional[str] = None
 ) -> str:
     """
     Get specific memory
@@ -323,16 +379,24 @@ def get_memory_by_id(
     Returns:
         JSON formatted string, returns error message if not found
     """
-    memory = get_memory()
-    result = memory.get(memory_id=memory_id, user_id=user_id, agent_id=agent_id)
-    if result is None:
-        return format_memories_for_llm({"error": f"Memory {memory_id} not found"})
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            result = client.get(memory_id=memory_id, user_id=user_id, agent_id=agent_id)
+        else:
+            memory = get_memory()
+            result = memory.get(memory_id=memory_id, user_id=user_id, agent_id=agent_id)
+        if result is None:
+            return format_memories_for_llm({"error": f"Memory {memory_id} not found"})
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[get_memory_by_id] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to get memory: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
 def update_memory(
-    memory_id: int,
+    memory_id: Union[int, str],
     content: str,
     user_id: Optional[str] = None,
     agent_id: Optional[str] = None,
@@ -356,20 +420,34 @@ def update_memory(
             metadata = json.loads(metadata)
         except json.JSONDecodeError:
             return json.dumps({"success": False, "error": "metadata must be a valid JSON object string or dict."}, ensure_ascii=False)
-    memory = get_memory()
-    result = memory.update(
-        memory_id=memory_id,
-        content=content,
-        user_id=user_id,
-        agent_id=agent_id,
-        metadata=metadata,
-    )
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            result = client.update(
+                memory_id=memory_id,
+                content=content,
+                user_id=user_id,
+                agent_id=agent_id,
+                metadata=metadata,
+            )
+        else:
+            memory = get_memory()
+            result = memory.update(
+                memory_id=memory_id,
+                content=content,
+                user_id=user_id,
+                agent_id=agent_id,
+                metadata=metadata,
+            )
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[update_memory] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to update memory: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
 def delete_memory(
-    memory_id: int, user_id: Optional[str] = None, agent_id: Optional[str] = None
+    memory_id: Union[int, str], user_id: Optional[str] = None, agent_id: Optional[str] = None
 ) -> str:
     """
     Delete memory
@@ -382,9 +460,17 @@ def delete_memory(
     Returns:
         JSON formatted string
     """
-    memory = get_memory()
-    success = memory.delete(memory_id=memory_id, user_id=user_id, agent_id=agent_id)
-    return format_memories_for_llm({"success": success, "memory_id": memory_id})
+    try:
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            success = client.delete(memory_id=memory_id, user_id=user_id, agent_id=agent_id)
+        else:
+            memory = get_memory()
+            success = memory.delete(memory_id=memory_id, user_id=user_id, agent_id=agent_id)
+        return format_memories_for_llm({"success": success, "memory_id": memory_id})
+    except Exception as e:
+        print(f"[delete_memory] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to delete memory: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -404,9 +490,17 @@ def delete_all_memories(
     Returns:
         JSON formatted string
     """
-    memory = get_memory()
-    success = memory.delete_all(user_id=user_id, agent_id=agent_id, run_id=run_id)
-    return format_memories_for_llm({"success": success})
+    try:
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            success = client.delete_all(user_id=user_id, agent_id=agent_id, run_id=run_id)
+        else:
+            memory = get_memory()
+            success = memory.delete_all(user_id=user_id, agent_id=agent_id, run_id=run_id)
+        return format_memories_for_llm({"success": success})
+    except Exception as e:
+        print(f"[delete_all_memories] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to delete all memories: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -437,11 +531,21 @@ def list_memories(
             filters = json.loads(filters)
         except json.JSONDecodeError:
             return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
-    memory = get_memory()
-    result = memory.get_all(
-        user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, offset=offset
-    )
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_memory_client()
+            result = client.get_all(
+                user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, offset=offset
+            )
+        else:
+            memory = get_memory()
+            result = memory.get_all(
+                user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, offset=offset
+            )
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[list_memories] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to list memories: {str(e)}"}, ensure_ascii=False)
 
 
 # ============================================================================
@@ -571,18 +675,32 @@ def add_memory_with_profile(
         )
 
     try:
-        user_memory = get_user_memory()
-        result = user_memory.add(
-            messages=messages,
-            user_id=user_id,
-            agent_id=agent_id,
-            run_id=run_id,
-            metadata=metadata,
-            infer=infer,
-            profile_type=profile_type,
-            custom_topics=custom_topics,
-            strict_mode=strict_mode,
-        )
+        if is_proxy_mode():
+            client = get_http_user_client()
+            result = client.add(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                metadata=metadata,
+                infer=infer,
+                profile_type=profile_type,
+                custom_topics=custom_topics,
+                strict_mode=strict_mode,
+            )
+        else:
+            user_memory = get_user_memory()
+            result = user_memory.add(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                metadata=metadata,
+                infer=infer,
+                profile_type=profile_type,
+                custom_topics=custom_topics,
+                strict_mode=strict_mode,
+            )
         print(
             f"[add_memory_with_profile] Successfully added memory with profile for agent_id={agent_id}, user_id={user_id}, result={result}"
         )
@@ -633,18 +751,35 @@ def search_memories_with_profile(
             filters = json.loads(filters)
         except json.JSONDecodeError:
             return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
-    user_memory = get_user_memory()
-    result = user_memory.search(
-        query=query,
-        user_id=user_id,
-        agent_id=agent_id,
-        run_id=run_id,
-        limit=limit,
-        threshold=threshold,
-        filters=filters,
-        add_profile=add_profile,
-    )
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_user_client()
+            result = client.search(
+                query=query,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                limit=limit,
+                threshold=threshold,
+                filters=filters,
+                add_profile=add_profile,
+            )
+        else:
+            user_memory = get_user_memory()
+            result = user_memory.search(
+                query=query,
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                limit=limit,
+                threshold=threshold,
+                filters=filters,
+                add_profile=add_profile,
+            )
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[search_memories_with_profile] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to search memories with profile: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -668,13 +803,19 @@ def get_user_profile(user_id: str) -> str:
         - updated_at: Last update timestamp
         Or error message if not found
     """
-    user_memory = get_user_memory()
-    result = user_memory.profile(user_id=user_id)
-    if result is None:
-        return format_memories_for_llm(
-            {"error": f"Profile for user {user_id} not found"}
-        )
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_user_client()
+            result = client.profile(user_id=user_id)
+        else:
+            user_memory = get_user_memory()
+            result = user_memory.profile(user_id=user_id)
+        if result is None:
+            return format_memories_for_llm({"error": f"Profile for user {user_id} not found"})
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[get_user_profile] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to get user profile: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -718,16 +859,31 @@ def list_user_profiles(
     main_topic = _coerce_list(main_topic)
     sub_topic = _coerce_list(sub_topic)
     topic_value = _coerce_list(topic_value)
-    user_memory = get_user_memory()
-    result = user_memory.profile_list(
-        user_id=user_id,
-        main_topic=main_topic,
-        sub_topic=sub_topic,
-        topic_value=topic_value,
-        limit=limit,
-        offset=offset,
-    )
-    return format_memories_for_llm({"profiles": result, "count": len(result)})
+    try:
+        if is_proxy_mode():
+            client = get_http_user_client()
+            result = client.profile_list(
+                user_id=user_id,
+                main_topic=main_topic,
+                sub_topic=sub_topic,
+                topic_value=topic_value,
+                limit=limit,
+                offset=offset,
+            )
+        else:
+            user_memory = get_user_memory()
+            result = user_memory.profile_list(
+                user_id=user_id,
+                main_topic=main_topic,
+                sub_topic=sub_topic,
+                topic_value=topic_value,
+                limit=limit,
+                offset=offset,
+            )
+        return format_memories_for_llm({"profiles": result, "count": len(result)})
+    except Exception as e:
+        print(f"[list_user_profiles] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to list user profiles: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -744,22 +900,30 @@ def delete_user_profile(user_id: str) -> str:
     Returns:
         JSON formatted string with success status
     """
-    user_memory = get_user_memory()
-    success = user_memory.delete_profile(user_id=user_id)
-    return format_memories_for_llm(
-        {
-            "success": success,
-            "user_id": user_id,
-            "message": f"Profile for user {user_id} deleted"
-            if success
-            else f"Profile for user {user_id} not found",
-        }
-    )
+    try:
+        if is_proxy_mode():
+            client = get_http_user_client()
+            success = client.delete_profile(user_id=user_id)
+        else:
+            user_memory = get_user_memory()
+            success = user_memory.delete_profile(user_id=user_id)
+        return format_memories_for_llm(
+            {
+                "success": success,
+                "user_id": user_id,
+                "message": f"Profile for user {user_id} deleted"
+                if success
+                else f"Profile for user {user_id} not found",
+            }
+        )
+    except Exception as e:
+        print(f"[delete_user_profile] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to delete user profile: {str(e)}"}, ensure_ascii=False)
 
 
 @mcp.tool()
 def delete_memory_with_profile(
-    memory_id: int,
+    memory_id: Union[int, str],
     user_id: str,
     agent_id: Optional[str] = None,
     delete_profile: bool = False,
@@ -776,21 +940,34 @@ def delete_memory_with_profile(
     Returns:
         JSON formatted string with success status
     """
-    user_memory = get_user_memory()
-    success = user_memory.delete(
-        memory_id=memory_id,
-        user_id=user_id,
-        agent_id=agent_id,
-        delete_profile=delete_profile,
-    )
-    result = {
-        "success": success,
-        "memory_id": memory_id,
-        "user_id": user_id,
-    }
-    if delete_profile:
-        result["profile_deleted"] = delete_profile
-    return format_memories_for_llm(result)
+    try:
+        if is_proxy_mode():
+            client = get_http_user_client()
+            success = client.delete(
+                memory_id=memory_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                delete_profile=delete_profile,
+            )
+        else:
+            user_memory = get_user_memory()
+            success = user_memory.delete(
+                memory_id=memory_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                delete_profile=delete_profile,
+            )
+        result = {
+            "success": success,
+            "memory_id": memory_id,
+            "user_id": user_id,
+        }
+        if delete_profile:
+            result["profile_deleted"] = delete_profile
+        return format_memories_for_llm(result)
+    except Exception as e:
+        print(f"[delete_memory_with_profile] Error: {e}")
+        return json.dumps({"success": False, "error": f"Failed to delete memory with profile: {str(e)}"}, ensure_ascii=False)
 
 
 # ============================================================================
