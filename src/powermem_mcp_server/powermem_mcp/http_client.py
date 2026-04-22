@@ -91,7 +91,15 @@ class PowerMemHTTPClient:
         if filters is not None:
             body["filters"] = filters
         # threshold is not supported by HTTP server, ignored in proxy mode
-        return self._data(self._request("POST", "/memories/search", json=body))
+        data = self._data(self._request("POST", "/memories/search", json=body)) or {}
+        # Normalize: PowerMem server uses 'content' field, embedded mode uses 'memory'
+        # Also use _vector_similarity as score for consistency with embedded mode
+        for item in data.get("results", []):
+            if "content" in item and "memory" not in item:
+                item["memory"] = item["content"]
+            if "metadata" in item and "_vector_similarity" in item["metadata"] and item.get("score", 0) < 0.1:
+                item["score"] = item["metadata"]["_vector_similarity"]
+        return data
 
     def get(
         self,
@@ -173,6 +181,10 @@ class PowerMemHTTPClient:
         # Normalize to {"results": [...], "total": N} for consistency with search response
         if isinstance(data, dict) and "memories" in data and "results" not in data:
             data = {**data, "results": data["memories"]}
+        # Normalize: 'content' -> 'memory' for consistency with embedded mode
+        for item in data.get("results", []):
+            if "content" in item and "memory" not in item:
+                item["memory"] = item["content"]
         return data
 
     def close(self) -> None:
