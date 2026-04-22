@@ -4,6 +4,34 @@ PowerMem MCP Server - Model Context Protocol server for PowerMem memory manageme
 
 English | [简体中文](powermem_mcp_server_CN.md)
 
+## Operating Modes
+
+PowerMem MCP Server supports two operating modes:
+
+### Embedded Mode (Default)
+
+The powermem library runs in-process. No external service required. Configure via `.env`:
+
+```ini
+DATABASE_PROVIDER=sqlite
+LLM_PROVIDER=openai
+EMBEDDING_PROVIDER=qwen
+# ... other powermem settings
+```
+
+### Proxy Mode
+
+PowerMem MCP acts as a middleware and forwards all requests to a remote PowerMem server via HTTP. This avoids version conflicts between powermem-mcp and a separately deployed powermem server.
+
+Set `POWERMEM_SERVER_URL` in `.env` to enable:
+
+```ini
+POWERMEM_SERVER_URL=http://127.0.0.1:8000
+POWERMEM_SERVER_API_KEY=your_server_api_key_here   # optional
+```
+
+When `POWERMEM_SERVER_URL` is set, all other powermem settings (database, LLM, embedding) are managed by the remote server and can be omitted from `.env`.
+
 ## Startup
 
 ### Support for multiple types of MCP
@@ -36,15 +64,24 @@ Claude Desktop config example:
 
 ## Available Tools
 
-The PowerMem MCP Server provides the following memory management tools:
+### Core Memory Tools
 
 - **add_memory**: Add new memory to storage. Supports string, message dict, or message list format. Can use intelligent mode for automatic inference.
 - **search_memories**: Search memories by query text with optional filters, limit, and similarity threshold.
-- **get_memory_by_id**: Get a specific memory by its ID.
+- **get_memory_by_id**: Get a specific memory by its ID (`memory_id` accepts both `int` and `str`).
 - **update_memory**: Update the content and metadata of an existing memory.
 - **delete_memory**: Delete a specific memory by its ID.
 - **delete_all_memories**: Batch delete memories by user_id, agent_id, or run_id.
 - **list_memories**: List all memories with pagination support (limit and offset) and optional filters.
+
+### User Profile Tools
+
+- **add_memory_with_profile**: Add memory and extract user profile information from conversation. Supports `content` (natural language) and `topics` (structured JSON) profile types.
+- **search_memories_with_profile**: Search memories and optionally include the user's profile in the results for personalized responses.
+- **get_user_profile**: Get a user's profile by user_id.
+- **list_user_profiles**: List user profiles with optional filtering by user_id and topic fields.
+- **delete_user_profile**: Delete a user's profile by user_id.
+- **delete_memory_with_profile**: Delete a memory and optionally the associated user profile.
 
 ## Community
 
