@@ -272,7 +272,7 @@ def search_memories(
     run_id: Optional[str] = None,
     limit: int = 10,
     threshold: Optional[float] = None,
-    filters: Optional[Dict[str, Any]] = None,
+    filters: Optional[Union[str, Dict[str, Any]]] = None,
 ) -> str:
     """
     Search memories
@@ -289,6 +289,11 @@ def search_memories(
     Returns:
         JSON formatted string
     """
+    if isinstance(filters, str):
+        try:
+            filters = json.loads(filters)
+        except json.JSONDecodeError:
+            return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
     memory = get_memory()
     result = memory.search(
         query=query,
@@ -346,6 +351,11 @@ def update_memory(
     Returns:
         JSON formatted string
     """
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            return json.dumps({"success": False, "error": "metadata must be a valid JSON object string or dict."}, ensure_ascii=False)
     memory = get_memory()
     result = memory.update(
         memory_id=memory_id,
@@ -406,7 +416,7 @@ def list_memories(
     run_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    filters: Optional[Dict[str, Any]] = None,
+    filters: Optional[Union[str, Dict[str, Any]]] = None,
 ) -> str:
     """
     List all memories
@@ -422,6 +432,11 @@ def list_memories(
     Returns:
         JSON formatted string
     """
+    if isinstance(filters, str):
+        try:
+            filters = json.loads(filters)
+        except json.JSONDecodeError:
+            return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
     memory = get_memory()
     result = memory.get_all(
         user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, offset=offset
@@ -588,7 +603,7 @@ def search_memories_with_profile(
     run_id: Optional[str] = None,
     limit: int = 10,
     threshold: Optional[float] = None,
-    filters: Optional[Dict[str, Any]] = None,
+    filters: Optional[Union[str, Dict[str, Any]]] = None,
     add_profile: bool = True,
 ) -> str:
     """
@@ -613,6 +628,11 @@ def search_memories_with_profile(
         - profile_content: User's profile text (if add_profile=True and exists)
         - topics: User's structured topics (if add_profile=True and exists)
     """
+    if isinstance(filters, str):
+        try:
+            filters = json.loads(filters)
+        except json.JSONDecodeError:
+            return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
     user_memory = get_user_memory()
     result = user_memory.search(
         query=query,
@@ -660,9 +680,9 @@ def get_user_profile(user_id: str) -> str:
 @mcp.tool()
 def list_user_profiles(
     user_id: Optional[str] = None,
-    main_topic: Optional[List[str]] = None,
-    sub_topic: Optional[List[str]] = None,
-    topic_value: Optional[List[str]] = None,
+    main_topic: Optional[Union[str, List[str]]] = None,
+    sub_topic: Optional[Union[str, List[str]]] = None,
+    topic_value: Optional[Union[str, List[str]]] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> str:
@@ -686,6 +706,18 @@ def list_user_profiles(
     Returns:
         JSON formatted string containing list of profile dictionaries
     """
+    def _coerce_list(val):
+        if isinstance(val, str):
+            try:
+                parsed = json.loads(val)
+                return parsed if isinstance(parsed, list) else [parsed]
+            except json.JSONDecodeError:
+                return [val]
+        return val
+
+    main_topic = _coerce_list(main_topic)
+    sub_topic = _coerce_list(sub_topic)
+    topic_value = _coerce_list(topic_value)
     user_memory = get_user_memory()
     result = user_memory.profile_list(
         user_id=user_id,
