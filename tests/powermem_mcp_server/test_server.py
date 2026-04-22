@@ -192,6 +192,52 @@ class TestCoreMemoryTools:
         result = call_tool(base_url, session_id, "delete_all_memories", {"user_id": tmp_user})
         assert result.get("success") is True
 
+    def test_search_memories_with_filters(self, base_url, session_id, test_user_id):
+        # filters as empty dict
+        result = call_tool(base_url, session_id, "search_memories", {
+            "query": "hiking",
+            "user_id": test_user_id,
+            "limit": 5,
+            "filters": {},
+        })
+        assert "error" not in result
+
+        # filters as non-empty dict
+        result = call_tool(base_url, session_id, "search_memories", {
+            "query": "food",
+            "user_id": test_user_id,
+            "limit": 5,
+            "filters": {"source": "chat"},
+        })
+        assert "error" not in result
+
+    def test_list_memories_with_filters(self, base_url, session_id, test_user_id):
+        # filters as empty dict
+        result = call_tool(base_url, session_id, "list_memories", {
+            "user_id": test_user_id,
+            "limit": 10,
+            "filters": {},
+        })
+        assert "error" not in result
+
+        # filters as non-empty dict
+        result = call_tool(base_url, session_id, "list_memories", {
+            "user_id": test_user_id,
+            "limit": 10,
+            "filters": {"source": "chat"},
+        })
+        assert "error" not in result
+
+    def test_search_memories_with_filters_as_string(self, base_url, session_id, test_user_id):
+        """Verify string-form filters are coerced correctly (pydantic compat)."""
+        result = call_tool(base_url, session_id, "search_memories", {
+            "query": "hiking",
+            "user_id": test_user_id,
+            "limit": 5,
+            "filters": "{}",
+        })
+        assert "error" not in result
+
 
 # ---------------------------------------------------------------------------
 # Tests: user profile tools

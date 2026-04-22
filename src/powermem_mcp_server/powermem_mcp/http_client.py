@@ -165,7 +165,12 @@ class PowerMemHTTPClient:
             params["agent_id"] = agent_id
         if run_id is not None:
             params["run_id"] = run_id
-        return self._data(self._request("GET", "/memories", params=params))
+        data = self._data(self._request("GET", "/memories", params=params)) or {}
+        # HTTP server returns {"memories": [...], "total": N, ...}
+        # Normalize to {"results": [...], "total": N} for consistency with search response
+        if isinstance(data, dict) and "memories" in data and "results" not in data:
+            data = {**data, "results": data["memories"]}
+        return data
 
     def close(self) -> None:
         self._client.close()
