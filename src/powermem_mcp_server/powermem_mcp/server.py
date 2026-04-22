@@ -307,7 +307,21 @@ def add_memory(
                 metadata=metadata,
                 infer=infer,
             )
-        print("[add_memory] Successfully added memory")
+        # Check whether anything was actually stored (ADD or UPDATE > 0)
+        action_counts = {}
+        if isinstance(result, dict):
+            action_counts = result.get("action_counts", {})
+            if not action_counts:
+                # Try to derive from results list
+                for item in result.get("results", []):
+                    event = item.get("event", "NONE")
+                    action_counts[event] = action_counts.get(event, 0) + 1
+        stored = action_counts.get("ADD", 0) + action_counts.get("UPDATE", 0)
+        if stored > 0:
+            print(f"[add_memory] Successfully stored memory (ADD={action_counts.get('ADD',0)}, UPDATE={action_counts.get('UPDATE',0)})")
+        else:
+            print(f"[add_memory] No new memory stored — intelligent deduplication decided no action (action_counts={action_counts}). "
+                  "Tip: use infer=False to force-store without deduplication.")
         return format_memories_for_llm(result)
     except Exception as e:
         print(f"[add_memory] Error: {e}")
