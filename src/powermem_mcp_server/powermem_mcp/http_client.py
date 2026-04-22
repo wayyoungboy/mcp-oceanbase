@@ -37,7 +37,10 @@ class PowerMemHTTPClient:
 
     def _request(self, method: str, path: str, **kwargs) -> Dict:
         url = f"{self.base_url}/api/v1{path}"
+        req_body = kwargs.get("json") or kwargs.get("params") or {}
+        print(f"[proxy] {method} {url} | body: {json.dumps(req_body, ensure_ascii=False)[:300]}")
         response = self._client.request(method, url, **kwargs)
+        print(f"[proxy] response status: {response.status_code} | body: {response.text[:500]}")
         response.raise_for_status()
         return response.json()
 
@@ -193,7 +196,10 @@ class PowerMemUserHTTPClient:
 
     def _request(self, method: str, path: str, **kwargs) -> Dict:
         url = f"{self.base_url}/api/v1{path}"
+        req_body = kwargs.get("json") or kwargs.get("params") or {}
+        print(f"[proxy:user] {method} {url} | body: {json.dumps(req_body, ensure_ascii=False)[:300]}")
         response = self._client.request(method, url, **kwargs)
+        print(f"[proxy:user] response status: {response.status_code} | body: {response.text[:500]}")
         response.raise_for_status()
         return response.json()
 

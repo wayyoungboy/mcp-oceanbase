@@ -58,6 +58,7 @@ def get_http_memory_client() -> PowerMemHTTPClient:
     if _http_memory_client is None:
         url = os.getenv("POWERMEM_SERVER_URL", "")
         api_key = os.getenv("POWERMEM_SERVER_API_KEY")
+        print(f"[proxy] Initializing HTTP memory client -> {url} (api_key={'set' if api_key else 'none'})")
         _http_memory_client = PowerMemHTTPClient(url, api_key)
     return _http_memory_client
 
@@ -67,6 +68,7 @@ def get_http_user_client() -> PowerMemUserHTTPClient:
     if _http_user_client is None:
         url = os.getenv("POWERMEM_SERVER_URL", "")
         api_key = os.getenv("POWERMEM_SERVER_API_KEY")
+        print(f"[proxy] Initializing HTTP user client -> {url} (api_key={'set' if api_key else 'none'})")
         _http_user_client = PowerMemUserHTTPClient(url, api_key)
     return _http_user_client
 
@@ -286,6 +288,8 @@ def add_memory(
             f"[add_memory] Valid messages count: {len(messages)}, formatted: {messages}"
         )
 
+    mode = "proxy" if is_proxy_mode() else "embedded"
+    print(f"[add_memory] mode={mode} user_id={user_id} agent_id={agent_id} run_id={run_id} infer={infer}")
     try:
         if is_proxy_mode():
             client = get_http_memory_client()
@@ -361,6 +365,8 @@ def search_memories(
             filters = json.loads(filters)
         except json.JSONDecodeError:
             return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
+    mode = "proxy" if is_proxy_mode() else "embedded"
+    print(f"[search_memories] mode={mode} query={query!r} user_id={user_id} agent_id={agent_id} run_id={run_id} limit={limit} threshold={threshold} filters={filters}")
     try:
         if is_proxy_mode():
             client = get_http_memory_client()
@@ -384,7 +390,8 @@ def search_memories(
                 threshold=threshold,
                 filters=filters,
             )
-        print(f"[search_memories] result: {result}")
+        count = len(result.get("results", [])) if isinstance(result, dict) else "?"
+        print(f"[search_memories] results_count={count} raw={str(result)[:300]}")
         return format_memories_for_llm(result)
     except Exception as e:
         print(f"[search_memories] Error: {e}")
@@ -558,6 +565,8 @@ def list_memories(
             filters = json.loads(filters)
         except json.JSONDecodeError:
             return json.dumps({"success": False, "error": "filters must be a valid JSON object string or dict."}, ensure_ascii=False)
+    mode = "proxy" if is_proxy_mode() else "embedded"
+    print(f"[list_memories] mode={mode} user_id={user_id} agent_id={agent_id} run_id={run_id} limit={limit} offset={offset}")
     try:
         if is_proxy_mode():
             client = get_http_memory_client()
@@ -569,6 +578,8 @@ def list_memories(
             result = memory.get_all(
                 user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, offset=offset
             )
+        count = len(result.get("results", result.get("memories", []))) if isinstance(result, dict) else "?"
+        print(f"[list_memories] results_count={count}")
         return format_memories_for_llm(result)
     except Exception as e:
         print(f"[list_memories] Error: {e}")
@@ -1031,6 +1042,12 @@ def main():
         except ValueError:
             print(f"Invalid port number: {sys.argv[2]}, using default port 8000")
             port = 8000
+
+    # Print startup mode info
+    mode = "proxy" if is_proxy_mode() else "embedded"
+    server_url = os.getenv("POWERMEM_SERVER_URL", "")
+    powermem_mode_env = os.getenv("POWERMEM_MODE", "(not set)")
+    print(f"[startup] mode={mode} POWERMEM_MODE={powermem_mode_env} POWERMEM_SERVER_URL={server_url or '(not set)'}")
 
     # Start server based on transport method
     if transport == "stdio":
