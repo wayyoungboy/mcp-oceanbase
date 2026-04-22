@@ -10,9 +10,11 @@ PowerMem MCP Server 支持两种运行模式：
 
 ### 嵌入模式（默认）
 
-powermem 库在进程内运行，无需外部服务。通过 `.env` 文件配置：
+powermem 库在进程内运行，无需外部服务。
 
 ```ini
+POWERMEM_MODE=embedded   # 或省略此项
+
 DATABASE_PROVIDER=sqlite
 LLM_PROVIDER=openai
 EMBEDDING_PROVIDER=qwen
@@ -23,14 +25,15 @@ EMBEDDING_PROVIDER=qwen
 
 PowerMem MCP 作为中间件，将所有请求通过 HTTP 转发到远端 PowerMem Server。适用于避免 powermem-mcp 与已部署的 powermem 服务之间的版本冲突。
 
-在 `.env` 中设置 `POWERMEM_SERVER_URL` 即可启用：
+通过 `.env` 中的 `POWERMEM_MODE` 切换模式（默认：`embedded`）。
 
 ```ini
+POWERMEM_MODE=proxy
 POWERMEM_SERVER_URL=http://127.0.0.1:8000
 POWERMEM_SERVER_API_KEY=your_server_api_key_here   # 可选
 ```
 
-设置 `POWERMEM_SERVER_URL` 后，数据库、LLM、Embedding 等配置均由远端服务管理，`.env` 中可省略这些配置项。
+设置 `POWERMEM_MODE=proxy` 后，数据库、LLM、Embedding 等配置均由远端服务管理，`.env` 中可省略这些配置项。
 
 ## 前置条件
 

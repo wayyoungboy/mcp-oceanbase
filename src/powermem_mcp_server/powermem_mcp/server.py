@@ -36,7 +36,20 @@ _http_user_client = None
 
 
 def is_proxy_mode() -> bool:
-    """Return True if POWERMEM_SERVER_URL is set (proxy mode), False for embedded mode."""
+    """Return True for proxy mode, False for embedded mode (default).
+
+    Priority:
+      1. POWERMEM_MODE=proxy  → proxy
+      2. POWERMEM_MODE=embedded → embedded
+      3. POWERMEM_SERVER_URL set (no POWERMEM_MODE) → proxy (backward compat)
+      4. default → embedded
+    """
+    mode = os.getenv("POWERMEM_MODE", "").strip().lower()
+    if mode == "proxy":
+        return True
+    if mode == "embedded":
+        return False
+    # Backward compatibility: treat POWERMEM_SERVER_URL presence as proxy mode
     return bool(os.getenv("POWERMEM_SERVER_URL"))
 
 

@@ -8,11 +8,15 @@ English | [简体中文](powermem_mcp_server_CN.md)
 
 PowerMem MCP Server supports two operating modes:
 
+Switch between modes via `POWERMEM_MODE` in `.env` (default: `embedded`).
+
 ### Embedded Mode (Default)
 
-The powermem library runs in-process. No external service required. Configure via `.env`:
+The powermem library runs in-process. No external service required.
 
 ```ini
+POWERMEM_MODE=embedded   # or omit entirely
+
 DATABASE_PROVIDER=sqlite
 LLM_PROVIDER=openai
 EMBEDDING_PROVIDER=qwen
@@ -23,14 +27,13 @@ EMBEDDING_PROVIDER=qwen
 
 PowerMem MCP acts as a middleware and forwards all requests to a remote PowerMem server via HTTP. This avoids version conflicts between powermem-mcp and a separately deployed powermem server.
 
-Set `POWERMEM_SERVER_URL` in `.env` to enable:
-
 ```ini
+POWERMEM_MODE=proxy
 POWERMEM_SERVER_URL=http://127.0.0.1:8000
 POWERMEM_SERVER_API_KEY=your_server_api_key_here   # optional
 ```
 
-When `POWERMEM_SERVER_URL` is set, all other powermem settings (database, LLM, embedding) are managed by the remote server and can be omitted from `.env`.
+When `POWERMEM_MODE=proxy`, all powermem settings (database, LLM, embedding) are managed by the remote server and can be omitted from `.env`.
 
 ## Startup
 
