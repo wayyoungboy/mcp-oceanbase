@@ -1025,11 +1025,14 @@ def main():
     elif transport == "sse":
         print(f"Starting PowerMem MCP Server with SSE transport on port {port}...")
         mcp.run(transport="sse", host="0.0.0.0", port=port, path=path)
-    else:  # streamable-http
+    elif transport == "streamable-http":
         print(
             f"Starting PowerMem MCP Server with streamable-http transport on port {port}..."
         )
         mcp.run(transport="streamable-http", host="0.0.0.0", port=port, path=path)
+    else:
+        print(f"Error: Unknown transport '{transport}'. Valid options: stdio, sse, streamable-http")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
